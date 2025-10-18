@@ -1,22 +1,22 @@
 ---
 title: 'Topic Modeling in R: LDA vs NMF with Associated Press'
 output:
-  pdf_document:
-    toc: true
-    toc_depth: '3'
   html_document:
     toc: true
     toc_depth: 3
     toc_float: true
     number_sections: true
+  pdf_document:
+    toc: true
+    toc_depth: '3'
 ---
 
 # Overview & Learning Goals
 
 This R Markdown file presents a comparison of two topic modeling approaches using an R dataset:
 
-- **Latent Dirichlet Allocation (LDA)** — a probabilistic model that learns topics as word distributions and documents as mixtures of topics.
-- **Non-negative Matrix Factorization (NMF)** — a linear-algebra approach that factorizes a document–term matrix into non-negative parts (“topics”) and document weights.
+- **Latent Dirichlet Allocation (LDA):** a probabilistic model that learns topics as word distributions and documents as mixtures of topics.
+- **Non-negative Matrix Factorization (NMF): ** a linear-algebra approach that factorizes a document–term matrix into non-negative parts (“topics”) and document weights.
 
 We will:
 
@@ -99,27 +99,28 @@ Filtering steps:
 
 ```{r vocab, message=FALSE, warning=FALSE}
 # Document frequency: number of documents containing the term
-df <- slam::col_sums(dtm > 0)
-keep <- (df >= min_df) & (df <= max_df_prop * n_docs)
+df <- slam::col_sums(dtm > 0)                                   # df_j = count of docs where term j appears at least once
+keep <- (df >= min_df) & (df <= max_df_prop * n_docs)           # keep terms that are not too rare and not too common
 
 # Limit to top features by overall term frequency (within 'keep')
-tf  <- slam::col_sums(dtm[, keep])
-ord <- order(tf, decreasing = TRUE)
-if (length(ord) > max_features) ord <- ord[seq_len(max_features)]
-keep_terms <- names(tf)[ord]
+tf  <- slam::col_sums(dtm[, keep])                              # total term frequency per kept term (sum over all docs)
+ord <- order(tf, decreasing = TRUE)                             # rank kept terms by frequency (highest first)
+if (length(ord) > max_features) ord <- ord[seq_len(max_features)] # cap to top 'max_features' indices if needed
+keep_terms <- names(tf)[ord]                                    # get the term names (vocabulary) for those top features
 
 # Apply selection
-dtm_filt <- dtm[, keep_terms]
-dtm_filt <- dtm_filt[, slam::col_sums(dtm_filt) > 0]  # ensure non-empty columns
+dtm_filt <- dtm[, keep_terms]                                   # restrict DTM to the selected terms (columns)
+dtm_filt <- dtm_filt[, slam::col_sums(dtm_filt) > 0]            # drop any columns that ended up all-zero (safety)
 
 # Drop empty documents
-nz_docs <- slam::row_sums(dtm_filt) > 0
-dtm_filt <- dtm_filt[nz_docs, ]
+nz_docs <- slam::row_sums(dtm_filt) > 0                         # logical vector: which rows (docs) still have at least one term
+dtm_filt <- dtm_filt[nz_docs, ]                                 # keep only non-empty documents
 
 # Refresh doc count for downstream code
-n_docs <- nrow(dtm_filt)
+n_docs <- nrow(dtm_filt)                                        # update N to reflect the filtered corpus size
 
-dim(dtm_filt)
+dim(dtm_filt)                                                   # show final matrix dimensions: (#docs, #terms)
+
 ```
 
 ## Build TF–IDF (sublinear TF + L2 row norm)
@@ -187,6 +188,44 @@ V_tfidf <- Diagonal(x = 1 / row_norm) %*% V_tfidf
 dim(V_tfidf)
 ```
 
+Note: A **DTM** is a **Document–Term Matrix**: a bag-of-words table where **rows are documents**, **columns are terms (tokens)**, and each cell holds a weight—usually a **count** (term frequency), but it could be binary or TF-IDF. It captures *what words appear how many times* in each document, while **ignoring word order** (bag-of-words).
+
+* Shape: $N \times V$ (documents × vocabulary). Very sparse in practice, so we store it as a sparse matrix (e.g., `slam::simple_triplet_matrix`, `Matrix::dgCMatrix`).
+* Conventions: **DTM** = docs as rows; **TDM** = the transpose (terms as rows).
+* Modeling: **LDA** expects **integer counts** from a DTM; **NMF/LSA** can use counts or TF-IDF.
+
+Here’s what each part is doing, in order:
+
+1. **From slam triplets to a fast sparse matrix (counts)**
+
+* `stm <- dtm_filt` takes your filtered **slam::simple_triplet_matrix** (docs × terms).
+* `doc_ids`, `term_ids` ensure you have readable row/col names; if missing, synthetic IDs are created.
+* `V_counts <- sparseMatrix(i=stm$i, j=stm$j, x=stm$v, ...)` rebuilds the matrix as a **Matrix::dgCMatrix** (column-compressed, efficient for linear algebra). The triplet slots mean: `stm$i` = document indices, `stm$j` = term indices, `stm$v` = count values.
+
+2. **TF step: sublinear scaling of counts**
+
+* `V_tf <- V_counts; V_tf@x <- log1p(V_tf@x)` applies **sublinear TF**: $tf'=\log(1+tf)$.
+  This gives diminishing returns to repeated words and reduces document-length bias.
+
+3. **IDF step: document frequency and smoothed IDF**
+
+* `df_filt <- slam::col_sums(dtm_filt > 0)` computes document frequency for each term: $df_j=\#{d:,tf_{d,j}>0}$.
+* `idf <- log((1 + n_docs) / (1 + df_filt)) + 1` computes smoothed IDF:
+  $$idf_j=\log!\Big(\frac{1+N}{1+df_j}\Big)+1,$$
+  where $N=n_{\text{docs}}$. The +1’s prevent division by zero and extreme values for rare terms.
+
+4. **Build TF–IDF and L2-normalize each document**
+
+* `V_tfidf <- V_tf %*% Diagonal(x = idf)` multiplies each **term column** by its $idf_j$, i.e., $tfidf_{d,j}=tf'_{d,j}\cdot idf_j$.
+* `row_norm <- sqrt(rowSums(V_tfidf^2))` computes $\lVert \mathbf{x}_d\rVert_2$ for each document row.
+* `row_norm[row_norm == 0] <- 1` safeguards empty rows.
+* `V_tfidf <- Diagonal(x = 1 / row_norm) %*% V_tfidf` scales each document to unit length:
+  $$\mathbf{x}_d \leftarrow \frac{\mathbf{x}_d}{\lVert \mathbf{x}_d\rVert_2}.$$
+
+5. **Sanity check**
+
+* `dim(V_tfidf)` prints the final shape (docs × terms), confirming TF–IDF has the same dimensions as the counts matrix.
+
 ---
 
 # Fit the Models
@@ -250,6 +289,47 @@ cat("### Topics in NMF (counts, KL)\n")
 tw_nmf <- top_words(phi_nmf, n_top_words, feat_names)
 for (i in seq_along(tw_nmf)) cat(sprintf("Topic #%d:\n%s\n\n", i-1, tw_nmf[[i]]))
 ```
+
+1. **Get LDA topic–word probs ($\phi$)**
+
+* `lda_post <- posterior(lda_model)` computes posterior estimates for your fitted LDA model.
+* `phi_lda <- lda_post$terms` pulls the **topics × vocabulary** matrix where each row is a topic and each entry is $P(\text{word}\mid \text{topic})$. Rows already sum to 1 (probabilities).
+
+2. **Get NMF topic–word weights and make them comparable**
+
+* `W <- basis(nmf_model)` returns the NMF **basis** matrix $W$ with shape **features × k** (terms × topics).
+* `phi_nmf <- t(W)` transposes to **topics × features** so rows correspond to topics like LDA’s $\phi$.
+* `phi_nmf <- phi_nmf / pmax(rowSums(phi_nmf), 1e-12)` row-normalizes so each topic’s weights sum to $\approx 1$ (now interpretable like probabilities). `pmax(..., 1e-12)` avoids division by zero.
+
+3. **Name the columns (vocabulary)**
+
+* `feat_names <- colnames(as.matrix(dtm_filt))` grabs the term names in the same order as your matrices’ columns (the vocabulary you filtered earlier).
+
+4. **Helper to extract top words per topic**
+
+* `top_words <- function(phi, topn, features)`:
+
+  * `apply(phi, 1, ...)` iterates **row-wise** (topic by topic).
+  * `ids <- order(row, decreasing = TRUE)[seq_len(min(topn, length(row)))]` finds the indices of the **top-$N$** highest-weight words for that topic.
+  * `paste(features[ids], collapse = " ")` maps those indices to term strings and joins them into one label line.
+  * Returns a character vector: one string per topic.
+
+5. **Print LDA topics**
+
+* `cat("### Topics in LDA (counts)\n")` prints a header.
+* `tw_lda <- top_words(phi_lda, ...)` gets the top words from LDA’s $\phi$.
+* The `for` loop prints “Topic #0, #1, …” (note the `i-1` to show **0-based** labels) and the corresponding top words.
+
+6. **Print NMF topics**
+
+* `cat("### Topics in NMF (counts, KL)\n")` prints a header that matches your configuration.
+* `tw_nmf <- top_words(phi_nmf, ...)` gets top words from the normalized NMF rows.
+* The loop prints each topic index (again zero-based) and its top words.
+
+**Notes:**
+
+* LDA’s `phi_lda` is **already probabilistic**; for NMF we **normalize** so both methods’ topic rows can be read similarly.
+* Topic indices are arbitrary within each model — **Topic #3 in LDA** isn’t guaranteed to match **Topic #3 in NMF**. If you ever compare across models/runs, align topics first.
 
 ---
 
