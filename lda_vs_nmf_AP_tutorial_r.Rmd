@@ -67,6 +67,13 @@ max_df_prop  <- 0.5       # drop very common terms: max doc proportion
 random_state <- 0         # reproducibility
 ```
 
+n_topics     <- 10        # number of topics
+n_top_words  <- 20        # words to display per topic
+max_features <- 5000      # vocabulary cap for fairness and speed
+min_df       <- 10        # drop very rare terms: min docs containing term
+max_df_prop  <- 0.5       # drop very common terms: max doc proportion
+random_state <- 0         # reproducibility
+
 ---
 
 # Data
