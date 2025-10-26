@@ -2498,7 +2498,7 @@ topic’s top-words list and join them with slashes. We can treat these as
 placeholders; they’re for navigation, not ground truth.</p>
 </div>
 <div id="labels" class="section level2">
-<h2>7) <code>labels</code></h2>
+<h2>7) Labels</h2>
 <ul>
 <li><strong>Inputs:</strong> The LDA <strong>top-words</strong>
 table.</li>
@@ -2555,18 +2555,16 @@ kable(auto_labels, caption = &quot;Auto labels (first 2–3 top words)&quot;)</c
 </tr>
 </tbody>
 </table>
-</div>
-<div id="the-auto-generated-labels-match-the-themes-we-see-elsewhere-topic-1-computerbrainintelligence-is-about-machine-capability-vs.-human-cognition-topic-2-relifespecies-blends-conversational-tokens-re-with-biology-terms-topic-3-asiwillagi-centers-on-agiasi-and-willtiming-language-topic-4-futuretimekurzweil-is-the-accelerationtimeline-motif-topic-5-turrygoalway-anchors-the-turry-vignette-and-goal-specificationmisalignment-thread." class="section level2">
-<h2>The auto-generated labels match the themes we see elsewhere: Topic 1
+<p>The auto-generated labels match the themes we see elsewhere: Topic 1
 (“computer/brain/intelligence”) is about machine capability vs. human
 cognition; Topic 2 (“’re/life/species”) blends conversational tokens
 (’re) with biology terms; Topic 3 (“asi/will/agi”) centers on AGI/ASI
 and “will”/timing language; Topic 4 (“future/time/kurzweil”) is the
 acceleration/timeline motif; Topic 5 (“turry/goal/way”) anchors the
-Turry vignette and goal-specification/misalignment thread.</h2>
-</div>
-<div id="notes" class="section level2">
-<h2>Notes</h2>
+Turry vignette and goal-specification/misalignment thread.</p>
+<hr />
+<div id="notes" class="section level3">
+<h3>Notes</h3>
 <ul>
 <li>Stemming vs. no stemming will change the top words (e.g.,
 <em>intellig</em> vs <em>intelligence</em>). I’ve elected not to use
@@ -2580,6 +2578,7 @@ large</strong>, adjust <code>lower.thresh</code> via
 <li>Results will <strong>not</strong> exactly match Python’s LDA due to
 different implementations/seeds, but they should be comparable.</li>
 </ul>
+</div>
 </div>
 </div>
 <div id="stm" class="section level1">

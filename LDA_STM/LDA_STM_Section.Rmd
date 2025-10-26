@@ -421,7 +421,7 @@ The top paragraphs make those themes concrete. Topic 1 pairs a passage on aging/
 
 This step creates quick, human-readable labels for each LDA topic so tables and figures can reference “Topic 1: …” with a short name. The idea is intentionally simple: take the first 2–3 tokens from each topic’s top-words list and join them with slashes. We can treat these as placeholders; they’re for navigation, not ground truth.
 
-## 7) `labels`
+## 7) Labels
 
 * **Inputs:** The LDA **top-words** table.
 * **What it does:** Creates quick **topic labels** by taking the first 2–3 top words (e.g., “economy/market/price”).
@@ -446,9 +446,10 @@ kable(auto_labels, caption = "Auto labels (first 2–3 top words)")
 ```
 
 The auto-generated labels match the themes we see elsewhere: Topic 1 (“computer/brain/intelligence”) is about machine capability vs. human cognition; Topic 2 (“’re/life/species”) blends conversational tokens (’re) with biology terms; Topic 3 (“asi/will/agi”) centers on AGI/ASI and “will”/timing language; Topic 4 (“future/time/kurzweil”) is the acceleration/timeline motif; Topic 5 (“turry/goal/way”) anchors the Turry vignette and goal-specification/misalignment thread.
+
 ---
 
-## Notes
+### Notes
 
 - Stemming vs. no stemming will change the top words (e.g., *intellig* vs *intelligence*). I've elected not to use stemming for readability and it didn't seem to improve results.
 - If the vocabulary is **too small** or **too large**, adjust `lower.thresh` via `stm::prepDocuments(...)`
