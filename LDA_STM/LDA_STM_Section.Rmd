@@ -1,16 +1,18 @@
 ---
 title: "LDA and STM in R Example"
 output:
-  pdf_document:
-    toc: true
   html_document:
     toc: true
     toc_float: true
+  pdf_document:
+    toc: true
 editor_options:
   chunk_output_type: inline
 ---
 
-## How the whole thing “flows”
+# Shared setup
+
+### How the whole thing “flows”
 
 1. **One preprocessing pipeline** (chunk 3) feeds **both** LDA and STM so we’re comparing apples to apples.
 2. LDA section: **fit → top words → top docs → quick labels** (chunks 5–7).
@@ -324,7 +326,7 @@ Topics are ordered by **prevalence** so LDA and STM tables share a consistent to
 
 ---
 
-## LDA (topicmodels)
+# LDA (topicmodels)
 
 Set **K** as we previously used for this problem in Python. Fit a baseline LDA on the trimmed DTM and order topics by prevalence so all downstream tables use a consistent topic order.
 
@@ -452,6 +454,18 @@ The auto-generated labels match the themes we see elsewhere: Topic 1 (“compute
 - If the vocabulary is **too small** or **too large**, adjust `lower.thresh` via `stm::prepDocuments(...)`
 - That is, lower `LOWER_THRESH` above; e.g., `LOWER_THRESH <- 6` or `10`).  
 - Results will **not** exactly match Python’s LDA due to different implementations/seeds, but they should be comparable.
+
+
+# STM
+
+The main three differences between `stm` and LDA are listed below. For our purposes, we only will focus on the second two.
+
+* Priors. In LDA, document–topic proportions use a Dirichlet prior: $\theta_d \sim \mathrm{Dirichlet}(\alpha)$. In STM, they use a logistic–normal prior whose mean depends on metadata: $z_d \sim \mathcal N(X_d \gamma,\ \Sigma)$ and $\theta_d=\mathrm{softmax}(z_d)$. Here $X_d\gamma$ lets covariates shift topic prevalence, and $\Sigma$ induces correlations among topics.
+
+* Prevalence covariates (affect how much of each topic shows up). Document-level predictors enter the mean of $z_d$ in the logistic–normal prior, so $\theta_d$ shifts with metadata. Use when you expect frequency changes across documents (time, author, party, length, etc.). R: `stm(..., prevalence = ~ party + s(year) + log(length))`.
+
+* Content covariate (changes how a topic is worded). A single categorical variable creates group-specific word distributions $\beta_{k \mid g}$ for each topic $k$ and group $g$ (e.g., “immigration” may emphasize *asylum, rights* vs. *border, enforcement*). Use only when you truly expect vocabulary to differ by group. R: `stm(..., content = ~ party)`.
+
 
 ## 8) `Fit STM
 
